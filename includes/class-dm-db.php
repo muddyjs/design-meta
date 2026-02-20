@@ -117,7 +117,41 @@ class DM_DB
      */
     public static function upsert_meta(int $post_id, array $mapped_data): bool
     {
-        return false;
+        global $wpdb;
+
+        $columns = [
+            'designer',
+            'src_designer_url',
+            'designer_slug',
+            'src_pattern_url',
+            'pattern_slug',
+            'pin_path',
+            'pin_info',
+            'meta_description',
+        ];
+
+        $table_name = self::get_table_name();
+        $insert_columns = array_merge(['post_id'], $columns);
+
+        $values = [$post_id];
+        foreach ($columns as $column) {
+            $values[] = isset($mapped_data[$column]) ? (string) $mapped_data[$column] : '';
+        }
+
+        $placeholders = array_fill(0, count($insert_columns), '%s');
+        $placeholders[0] = '%d';
+
+        $update_assignments = [];
+        foreach ($columns as $column) {
+            $update_assignments[] = "{$column} = VALUES({$column})";
+        }
+
+        $sql = "INSERT INTO {$table_name} (" . implode(', ', $insert_columns) . ") VALUES (" . implode(', ', $placeholders) . ") ON DUPLICATE KEY UPDATE " . implode(', ', $update_assignments);
+        $prepared = $wpdb->prepare($sql, $values);
+
+        $result = $wpdb->query($prepared);
+
+        return $result !== false;
     }
 
     /**
@@ -128,7 +162,18 @@ class DM_DB
      */
     public static function get_meta_row(int $post_id): ?array
     {
-        return null;
+        global $wpdb;
+
+        $table_name = self::get_table_name();
+        $sql = "SELECT post_id, designer, src_designer_url, designer_slug, src_pattern_url, pattern_slug, pin_path, pin_info, meta_description FROM {$table_name} WHERE post_id = %d LIMIT 1";
+        $prepared = $wpdb->prepare($sql, $post_id);
+        $row = $wpdb->get_row($prepared, ARRAY_A);
+
+        if (! is_array($row)) {
+            return null;
+        }
+
+        return $row;
     }
 
     /**
@@ -139,7 +184,13 @@ class DM_DB
      */
     public static function delete_meta_row(int $post_id): bool
     {
-        return false;
+        global $wpdb;
+
+        $table_name = self::get_table_name();
+        $sql = "DELETE FROM {$table_name} WHERE post_id = %d";
+        $prepared = $wpdb->prepare($sql, $post_id);
+
+        return $wpdb->query($prepared) !== false;
     }
 
     /**
@@ -152,6 +203,26 @@ class DM_DB
      */
     public static function slug_exists(string $column, string $slug, int $exclude_post_id = 0): bool
     {
-        return false;
+        global $wpdb;
+
+        $allowed_columns = ['designer_slug', 'pattern_slug'];
+        if (! in_array($column, $allowed_columns, true) || $slug === '') {
+            return false;
+        }
+
+        $table_name = self::get_table_name();
+        $sql = "SELECT post_id FROM {$table_name} WHERE {$column} = %s LIMIT 1";
+        $prepared = $wpdb->prepare($sql, $slug);
+        $row = $wpdb->get_row($prepared, ARRAY_A);
+
+        if (! is_array($row)) {
+            return false;
+        }
+
+        if ($exclude_post_id > 0 && isset($row['post_id']) && (int) $row['post_id'] === $exclude_post_id) {
+            return false;
+        }
+
+        return true;
     }
 }

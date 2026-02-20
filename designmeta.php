@@ -32,4 +32,29 @@ function dm_bootstrap(): void
 }
 
 add_action('plugins_loaded', 'dm_bootstrap');
+
+
+/**
+ * Public save API wrapper.
+ *
+ * @param int $post_id Post identifier.
+ * @param array<string, mixed> $input Incoming payload.
+ * @return void
+ */
+function dm_save_all_data(int $post_id, array $input): void
+{
+    DM_Repository::save_all_data($post_id, $input);
+}
+
+/**
+ * Public read API wrapper.
+ *
+ * @param int $post_id Post identifier.
+ * @return array<string, string>
+ */
+function dm_get_data(int $post_id): array
+{
+    return DM_Repository::get_data($post_id);
+}
+
 register_activation_hook(__FILE__, ['DM_DB', 'activate']);
