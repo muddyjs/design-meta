@@ -21,6 +21,8 @@ require_once DM_PLUGIN_DIR . 'includes/class-dm-rest.php';
 require_once DM_PLUGIN_DIR . 'includes/class-dm-seo.php';
 require_once DM_PLUGIN_DIR . 'admin/admin-panel.php';
 
+register_activation_hook(DM_PLUGIN_FILE, array('DM_DB', 'activate'));
+
 /**
  * Main plugin bootstrap class.
  */
