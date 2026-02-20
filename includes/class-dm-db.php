@@ -11,7 +11,7 @@ class DM_DB
      */
     public static function init(): void
     {
-        // Hook registrations will be implemented in a later phase.
+        // Runtime DB hooks will be implemented in a later phase.
     }
 
     /**
@@ -21,7 +21,30 @@ class DM_DB
      */
     public static function activate(): void
     {
-        // Activation behavior will be implemented in a later phase.
+        self::maybe_create_table();
+    }
+
+    /**
+     * Ensure plugin table exists and matches current schema.
+     *
+     * @return void
+     */
+    public static function maybe_create_table(): void
+    {
+        global $wpdb;
+
+        $table_name = self::get_table_name();
+        $table_like = $wpdb->esc_like($table_name);
+        $existing_table = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_like));
+
+        self::create_table();
+
+        if ($existing_table !== $table_name) {
+            $verified = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_like));
+            if ($verified !== $table_name) {
+                error_log('[DesignMeta] Failed to create database table: ' . $table_name);
+            }
+        }
     }
 
     /**
@@ -31,7 +54,58 @@ class DM_DB
      */
     public static function create_table(): void
     {
-        // Table creation SQL will be implemented in a later phase.
+        global $wpdb;
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $sql = self::get_create_table_sql();
+        dbDelta($sql);
+
+        if (! empty($wpdb->last_error)) {
+            error_log('[DesignMeta] dbDelta error: ' . $wpdb->last_error);
+        }
+    }
+
+    /**
+     * Get fully-qualified table name.
+     *
+     * @return string
+     */
+    public static function get_table_name(): string
+    {
+        global $wpdb;
+
+        return $wpdb->prefix . 'dm_meta';
+    }
+
+    /**
+     * Build CREATE TABLE SQL for dbDelta.
+     *
+     * @return string
+     */
+    public static function get_create_table_sql(): string
+    {
+        global $wpdb;
+
+        $table_name = self::get_table_name();
+        $charset_collate = $wpdb->get_charset_collate();
+
+        return "CREATE TABLE {$table_name} (
+            post_id BIGINT UNSIGNED NOT NULL,
+            designer VARCHAR(191) NOT NULL DEFAULT '',
+            src_designer_url TEXT NULL,
+            designer_slug VARCHAR(191) NULL,
+            src_pattern_url TEXT NULL,
+            pattern_slug VARCHAR(191) NULL,
+            pin_path VARCHAR(512) NOT NULL DEFAULT '',
+            pin_info MEDIUMTEXT NULL,
+            meta_description TEXT NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (post_id),
+            UNIQUE KEY uniq_designer_slug (designer_slug),
+            UNIQUE KEY uniq_pattern_slug (pattern_slug),
+            KEY idx_updated_at (updated_at)
+        ) {$charset_collate};";
     }
 
     /**
