@@ -139,9 +139,15 @@ CREATE TABLE `wp_dm_meta` (
 
 ### 6.2 slug 生成规则
 1. 对 `designer_url`、`pattern_url` 执行 slug 化。
-2. 若存在对应 source URL，追加 4 位哈希后缀（`md5(source_url)` 前 4 位）。
-3. 若唯一索引冲突，追加递增后缀 `-2`, `-3`...（最多 20 次）。
-4. 超过重试上限时返回可观测错误日志。
+2. 设计师 slug 后缀改为基于**无天然同秒碰撞**的组合输入：
+   - `designer_hash_input = post_id + "|" + gmdate('Y-m-d H:i:s')`
+   - `designer_hash = substr(md5(designer_hash_input), 0, 4)`
+   - 生成：`designer_slug = sanitize_title(designer_url) + "-" + designer_hash`
+3. 下载 slug（`pattern_url`）沿用 source URL 4~6 位短哈希。
+4. 若唯一索引冲突，追加递增后缀 `-2`, `-3`...（最多 20 次）。
+5. 超过重试上限时返回可观测错误日志。
+
+> 说明：单独 `md5(time)` 会在同一秒天然碰撞；把 `post_id`（全局唯一）并入输入后，同秒写入不同 pattern 也不会因时间相同而碰撞。
 
 ### 6.3 图片路径规则
 1. 入库时将 uploads 绝对 URL 转为相对路径 `pin_path`。
